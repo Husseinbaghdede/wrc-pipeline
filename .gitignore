@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+.scrapy/
+logs/
+.venv/
+venv/
+raw.html
+clean.html

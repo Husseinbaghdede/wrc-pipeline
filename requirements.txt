@@ -1,0 +1,7 @@
+scrapy>=2.11
+pymongo>=4.6
+minio>=7.2
+beautifulsoup4>=4.12
+python-dotenv>=1.0
+python-dateutil>=2.8
+lxml>=5.1

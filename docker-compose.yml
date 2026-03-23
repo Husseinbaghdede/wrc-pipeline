@@ -1,0 +1,157 @@
+# =============================================================================
+# WRC Scraper Pipeline - Docker Compose
+#
+# Services:
+#   - mongodb:           NoSQL database for metadata storage
+#   - minio:             S3-compatible object storage for files
+#   - airflow-init:      One-time setup (creates admin user, initializes DB)
+#   - airflow-webserver: Web UI at http://localhost:8081
+#   - airflow-scheduler: Runs the DAG tasks
+#
+# Usage:
+#   docker-compose up --build -d
+#   Then open http://localhost:8081 (Airflow UI, admin/admin)
+#   And http://localhost:9001 (MinIO console, minioadmin/minioadmin)
+# =============================================================================
+
+x-airflow-common: &airflow-common
+  build: .
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: "KsOYkxMIjuSoKKWggSOi-GKw7GhIdNQDQP4i-rTBLlw="
+    AIRFLOW__WEBSERVER__SECRET_KEY: "wrc-scraper-secret-key"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    # Pass our config to Airflow containers so the scripts can connect
+    MONGO_URI: mongodb://mongodb:27017
+    MONGO_DB_NAME: wrc_scraper
+    MONGO_LANDING_COLLECTION: landing_metadata
+    MONGO_TRANSFORMED_COLLECTION: transformed_metadata
+    MINIO_ENDPOINT: minio:9000
+    MINIO_ACCESS_KEY: minioadmin
+    MINIO_SECRET_KEY: minioadmin
+    MINIO_LANDING_BUCKET: landing-zone
+    MINIO_TRANSFORMED_BUCKET: transformed-zone
+    DOWNLOAD_DELAY: "1.5"
+    CONCURRENT_REQUESTS: "4"
+    RETRY_TIMES: "3"
+    LOG_LEVEL: INFO
+    LOG_PATH: /opt/airflow/logs
+  volumes:
+    # Mount our project code into the Airflow container
+    - ./dags:/opt/airflow/dags
+    - ./scraper:/opt/airflow/scraper
+    - ./transform:/opt/airflow/transform
+    - ./common:/opt/airflow/common
+    - ./logs:/opt/airflow/logs
+  depends_on:
+    mongodb:
+      condition: service_healthy
+    minio:
+      condition: service_started
+    postgres:
+      condition: service_healthy
+
+services:
+  # ---------------------------------------------------------------------------
+  # MongoDB - stores metadata for decisions
+  # ---------------------------------------------------------------------------
+  mongodb:
+    image: mongo:7.0
+    platform: linux/amd64
+    container_name: wrc-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # MinIO - S3-compatible object storage for document files
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: wrc-minio
+    ports:
+      - "9000:9000"   # API endpoint
+      - "9001:9001"   # Web console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Airflow's internal metadata database
+  # (Airflow needs its own DB to track DAG runs, task states, etc.)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15
+    container_name: wrc-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Airflow Init - one-time setup
+  # Creates the admin user and initializes the Airflow database
+  # ---------------------------------------------------------------------------
+  airflow-init:
+    <<: *airflow-common
+    container_name: wrc-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com || true
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # Airflow Webserver - the UI at http://localhost:8081
+  # ---------------------------------------------------------------------------
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: wrc-airflow-webserver
+    command: airflow webserver --port 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # Airflow Scheduler - runs the DAG tasks
+  # ---------------------------------------------------------------------------
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: wrc-airflow-scheduler
+    command: airflow scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  mongodb_data:
+  minio_data:
+  postgres_data:
