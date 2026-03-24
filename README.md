@@ -15,25 +15,19 @@ git clone <repo-url>
 cd wrc-scraper
 ```
 
-### 2. Create environment file
+### 2. Start all services
 ```bash
-cp .env.example .env
-```
-Edit `.env` if you want to change any defaults (ports, credentials, etc.).
-
-### 3. Start all services
-```bash
-docker-compose up -d
+docker-compose up --build -d
 ```
 This starts: MongoDB, MinIO, PostgreSQL (Airflow DB), Airflow Webserver, and Airflow Scheduler.
 
 Wait ~60 seconds for all services to initialize.
 
-### 4. Access the UIs
+### 3. Access the UIs
 - **Airflow**: http://localhost:8081 (login: `admin` / `admin`)
 - **MinIO Console**: http://localhost:9001 (login: `minioadmin` / `minioadmin`)
 
-### 5. Run the pipeline
+### 4. Run the pipeline
 
 **Option A — Via Airflow UI (recommended):**
 1. Open http://localhost:8081
@@ -56,11 +50,11 @@ docker exec wrc-airflow-scheduler airflow dags trigger wrc_pipeline \
     --conf '{"start_date":"2024-01-01","end_date":"2025-01-01"}'
 ```
 
-### 6. Verify results
+### 5. Verify results
 - **MongoDB**: Check `wrc_scraper.landing_metadata` and `wrc_scraper.transformed_metadata` collections
 - **MinIO**: Browse `landing-zone` and `transformed-zone` buckets at http://localhost:9001
 
-### 7. Stop services
+### 6. Stop services
 ```bash
 docker-compose down
 ```
@@ -84,6 +78,7 @@ wrc-scraper/
 │   └── wrc_scraper/
 │       ├── settings.py         # Scrapy settings (throttling, retries)
 │       ├── items.py            # Data model for decisions
+│       ├── middlewares.py       # User-Agent rotation middleware
 │       ├── spiders/
 │       │   └── decisions_spider.py  # Main spider
 │       └── pipelines.py        # MongoDB + MinIO storage
@@ -99,7 +94,7 @@ wrc-scraper/
 
 ## Configuration
 
-All settings are configurable via environment variables (`.env` file):
+All settings are configurable via environment variables (set in `docker-compose.yml` for Docker, or in a `.env` file for local development):
 
 | Variable | Default | Description |
 |---|---|---|
@@ -108,10 +103,12 @@ All settings are configurable via environment variables (`.env` file):
 | `MINIO_ENDPOINT` | `localhost:9000` | MinIO API endpoint |
 | `MINIO_ACCESS_KEY` | `minioadmin` | MinIO access key |
 | `MINIO_SECRET_KEY` | `minioadmin` | MinIO secret key |
-| `DOWNLOAD_DELAY` | `1.5` | Seconds between requests |
+| `DOWNLOAD_DELAY` | `1.0` | Seconds between requests (AutoThrottle floor) |
 | `CONCURRENT_REQUESTS` | `4` | Max parallel requests |
 | `RETRY_TIMES` | `3` | Retry count for failed requests |
-| `PARTITION_SIZE` | `monthly` | Date partition granularity |
+| `AUTOTHROTTLE_MAX_DELAY` | `15` | Max delay AutoThrottle can set |
+| `AUTOTHROTTLE_TARGET_CONCURRENCY` | `2.0` | Target in-flight requests |
+| `DOWNLOAD_TIMEOUT` | `60` | Seconds before a request times out |
 
 ## Key Features
 

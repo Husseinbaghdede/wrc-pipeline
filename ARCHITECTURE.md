@@ -9,7 +9,7 @@ Monthly partitions provide a good balance between granularity and efficiency. Th
 We use a layered approach to avoid being blocked:
 
 1. **Scrapy AUTOTHROTTLE**: Automatically adjusts request speed based on the server's response time. If the server slows down, we slow down too.
-2. **DOWNLOAD_DELAY (1.5s)**: Minimum wait between requests, ensuring we never hammer the server.
+2. **DOWNLOAD_DELAY (1.0s)**: Minimum wait between requests, ensuring we never hammer the server.
 3. **CONCURRENT_REQUESTS (4)**: Moderate parallelism — fast enough to be efficient, conservative enough to be polite.
 4. **RETRY_TIMES (3)**: Failed requests are retried up to 3 times with backoff. HTTP 429 (Too Many Requests) and 5xx errors trigger retries.
 5. **User-Agent rotation**: Requests use a standard browser User-Agent header to avoid bot detection.
@@ -20,7 +20,7 @@ All parameters are configurable via environment variables, allowing operators to
 
 Idempotency is achieved through two mechanisms:
 
-1. **File-level**: Before uploading to MinIO, we calculate the SHA256 hash of the file content and compare it against the hash stored in the object's metadata. If identical, the upload is skipped. This prevents re-downloading unchanged documents.
+1. **File-level**: Before uploading to MinIO, we calculate the SHA256 hash and compare it against the hash stored in the object's metadata. If identical, the upload is skipped. For HTML files, the hash is computed from only the stable content (`div.content` text) rather than the full page, so that dynamic elements like CSRF tokens and analytics scripts don't cause false positives.
 2. **Record-level**: MongoDB uses `identifier` as a unique index. We use `update_one` with `upsert=True`, which inserts new records and updates existing ones. Running the pipeline twice with the same date range produces no duplicates and only updates records whose content has changed.
 
 This approach ensures that the pipeline can be safely re-run without data corruption or wasted bandwidth.
