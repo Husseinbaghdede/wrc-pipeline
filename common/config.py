@@ -25,24 +25,26 @@ MINIO_TRANSFORMED_BUCKET = os.getenv("MINIO_TRANSFORMED_BUCKET", "transformed-zo
 
 # --- Scraping ---
 PARTITION_SIZE = os.getenv("PARTITION_SIZE", "monthly")
-DOWNLOAD_DELAY = float(os.getenv("DOWNLOAD_DELAY", "1.5"))
+DOWNLOAD_DELAY = float(os.getenv("DOWNLOAD_DELAY", "1.0"))
 CONCURRENT_REQUESTS = int(os.getenv("CONCURRENT_REQUESTS", "4"))
 RETRY_TIMES = int(os.getenv("RETRY_TIMES", "3"))
+AUTOTHROTTLE_MAX_DELAY = float(os.getenv("AUTOTHROTTLE_MAX_DELAY", "15"))
+AUTOTHROTTLE_TARGET_CONCURRENCY = float(os.getenv("AUTOTHROTTLE_TARGET_CONCURRENCY", "2.0"))
+DOWNLOAD_TIMEOUT = int(os.getenv("DOWNLOAD_TIMEOUT", "60"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # --- Paths ---
 LOG_PATH = os.getenv("LOG_PATH", "./logs")
 
 # --- WRC Website ---
-WRC_BASE_URL = "https://www.workplacerelations.ie"
+WRC_BASE_URL = os.getenv("WRC_BASE_URL", "https://www.workplacerelations.ie")
 WRC_SEARCH_URL = f"{WRC_BASE_URL}/en/search/"
 
-# Body IDs on the WRC search page
+# Body IDs on the WRC search page (override via comma-separated "name:id" pairs)
+_default_bodies = "Employment Appeals Tribunal:2,Equality Tribunal:1,Labour Court:3,Workplace Relations Commission:15376"
 WRC_BODIES = {
-    "Employment Appeals Tribunal": "2",
-    "Equality Tribunal": "1",
-    "Labour Court": "3",
-    "Workplace Relations Commission": "15376",
+    pair.split(":")[0].strip(): pair.split(":")[1].strip()
+    for pair in os.getenv("WRC_BODIES", _default_bodies).split(",")
 }
 
-RESULTS_PER_PAGE = 10
+RESULTS_PER_PAGE = int(os.getenv("RESULTS_PER_PAGE", "10"))

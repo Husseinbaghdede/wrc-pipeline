@@ -33,9 +33,13 @@ x-airflow-common: &airflow-common
     MINIO_SECRET_KEY: minioadmin
     MINIO_LANDING_BUCKET: landing-zone
     MINIO_TRANSFORMED_BUCKET: transformed-zone
-    DOWNLOAD_DELAY: "1.5"
+    DOWNLOAD_DELAY: "1.0"
     CONCURRENT_REQUESTS: "4"
     RETRY_TIMES: "3"
+    AUTOTHROTTLE_MAX_DELAY: "15"
+    AUTOTHROTTLE_TARGET_CONCURRENCY: "2.0"
+    DOWNLOAD_TIMEOUT: "60"
+    RESULTS_PER_PAGE: "10"
     LOG_LEVEL: INFO
     LOG_PATH: /opt/airflow/logs
   volumes:

@@ -131,6 +131,7 @@ class DecisionsSpider(scrapy.Spider):
         for card in results:
             # Extract metadata from the card using CSS selectors
             identifier = card.css("h2.title::attr(title)").get("").strip()
+            title = card.css("h2.title::text").get("").strip() or identifier
             published_date = card.css("span.date::text").get("").strip()
             description = card.css("p.description::attr(title)").get("").strip()
             ref_no = card.css("span.refNO::text").get("").strip()
@@ -154,6 +155,7 @@ class DecisionsSpider(scrapy.Spider):
                 meta={
                     "item_data": {
                         "identifier": identifier,
+                        "title": title,
                         "description": description,
                         "published_date": published_date,
                         "ref_no": ref_no,
@@ -197,6 +199,7 @@ class DecisionsSpider(scrapy.Spider):
         # Build the item with all metadata
         item = DecisionItem()
         item["identifier"] = item_data["identifier"]
+        item["title"] = item_data["title"]
         item["description"] = item_data["description"]
         item["published_date"] = item_data["published_date"]
         item["ref_no"] = item_data["ref_no"]

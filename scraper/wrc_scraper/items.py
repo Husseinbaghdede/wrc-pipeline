@@ -12,6 +12,7 @@ import scrapy
 class DecisionItem(scrapy.Item):
     # --- From the search results page ---
     identifier = scrapy.Field()       # e.g. "ADJ-00054658" or "LCR23235"
+    title = scrapy.Field()            # Display title from the result card heading
     description = scrapy.Field()      # e.g. "Employee v Health Service"
     published_date = scrapy.Field()   # e.g. "17/07/2025"
     ref_no = scrapy.Field()           # e.g. "ADJ-00054658"

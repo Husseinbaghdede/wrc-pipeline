@@ -15,6 +15,7 @@ import hashlib
 import logging
 from io import BytesIO
 
+from bs4 import BeautifulSoup
 from scrapy.exceptions import DropItem
 from minio.error import S3Error
 
@@ -67,11 +68,14 @@ class MinIOPipeline:
         if not file_content:
             raise DropItem(f"No file content for {item['identifier']}")
 
-        # Calculate SHA256 hash of the file content
-        # This is used for:
-        # 1. Deduplication: skip upload if file hasn't changed
-        # 2. Stored in MongoDB so we can detect changes on re-runs
-        file_hash = hashlib.sha256(file_content).hexdigest()
+        # Calculate SHA256 hash for deduplication.
+        # For HTML files, we hash only the stable content (div.content)
+        # to ignore dynamic elements (CSRF tokens, session IDs, analytics)
+        # that change on every request. The full raw file is still stored.
+        if item["file_type"] == "html":
+            file_hash = self._stable_html_hash(file_content)
+        else:
+            file_hash = hashlib.sha256(file_content).hexdigest()
 
         # Build the file path in MinIO
         # Format: identifier.ext (e.g. "ADJ-00054658.html")
@@ -89,7 +93,13 @@ class MinIOPipeline:
             existing = self.client.stat_object(MINIO_LANDING_BUCKET, file_name)
             # File exists — check if content changed by comparing hash
             # We store the hash in the object's metadata
-            existing_hash = existing.metadata.get("x-amz-meta-file_hash", "")
+            # MinIO client may return the key with or without the
+            # "x-amz-meta-" prefix depending on version — check both
+            existing_hash = (
+                existing.metadata.get("x-amz-meta-file_hash")
+                or existing.metadata.get("file_hash")
+                or ""
+            )
             if existing_hash == file_hash:
                 logger.info(
                     f"File unchanged, skipping upload: {file_name} "
@@ -113,6 +123,32 @@ class MinIOPipeline:
         logger.info(f"Uploaded to MinIO: {file_name} ({len(file_content)} bytes)")
 
         return item
+
+    @staticmethod
+    def _stable_html_hash(html_bytes):
+        """
+        Produce a stable hash for HTML by extracting only the decision
+        content (div.content). This ignores dynamic page elements like
+        CSRF tokens, session IDs, and analytics scripts that change on
+        every request, so re-scraping the same decision yields the same hash.
+        """
+        try:
+            soup = BeautifulSoup(html_bytes, "lxml")
+            content = soup.find("div", class_="content")
+            if content:
+                # Remove scripts/styles inside content div too
+                for tag in content.find_all(["script", "style", "noscript"]):
+                    tag.decompose()
+                stable = content.get_text(strip=True)
+            else:
+                # Fallback: hash the full text content (no tags/scripts)
+                for tag in soup.find_all(["script", "style", "noscript"]):
+                    tag.decompose()
+                stable = soup.get_text(strip=True)
+            return hashlib.sha256(stable.encode("utf-8")).hexdigest()
+        except Exception:
+            # If parsing fails, fall back to raw hash
+            return hashlib.sha256(html_bytes).hexdigest()
 
     def _get_content_type(self, file_ext):
         """Map file extension to MIME type for proper storage."""
