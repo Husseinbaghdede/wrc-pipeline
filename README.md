@@ -105,10 +105,11 @@ All settings are configurable via environment variables (set in `docker-compose.
 | `MINIO_SECRET_KEY` | `minioadmin` | MinIO secret key |
 | `DOWNLOAD_DELAY` | `1.0` | Seconds between requests (AutoThrottle floor) |
 | `CONCURRENT_REQUESTS` | `4` | Max parallel requests |
-| `RETRY_TIMES` | `3` | Retry count for failed requests |
-| `AUTOTHROTTLE_MAX_DELAY` | `15` | Max delay AutoThrottle can set |
-| `AUTOTHROTTLE_TARGET_CONCURRENCY` | `2.0` | Target in-flight requests |
-| `DOWNLOAD_TIMEOUT` | `60` | Seconds before a request times out |
+| `RETRY_TIMES` | `5` | Retry count for failed requests |
+| `RETRY_PRIORITY_ADJUST` | `-4` | Priority adjustment for retried requests |
+| `AUTOTHROTTLE_MAX_DELAY` | `30` | Max delay AutoThrottle can set |
+| `AUTOTHROTTLE_TARGET_CONCURRENCY` | `1.5` | Target in-flight requests |
+| `DOWNLOAD_TIMEOUT` | `90` | Seconds before a request times out |
 
 ## Key Features
 

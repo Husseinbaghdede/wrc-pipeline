@@ -11,8 +11,9 @@ We use a layered approach to avoid being blocked:
 1. **Scrapy AUTOTHROTTLE**: Automatically adjusts request speed based on the server's response time. If the server slows down, we slow down too.
 2. **DOWNLOAD_DELAY (1.0s)**: Minimum wait between requests, ensuring we never hammer the server.
 3. **CONCURRENT_REQUESTS (4)**: Moderate parallelism — fast enough to be efficient, conservative enough to be polite.
-4. **RETRY_TIMES (3)**: Failed requests are retried up to 3 times with backoff. HTTP 429 (Too Many Requests) and 5xx errors trigger retries.
-5. **User-Agent rotation**: Requests use a standard browser User-Agent header to avoid bot detection.
+4. **RETRY_TIMES (5)**: Failed requests are retried up to 5 times. HTTP 429 (Too Many Requests) and 5xx errors trigger retries. Retried requests are pushed to the back of the queue (`RETRY_PRIORITY_ADJUST=-4`) so the server has time to recover.
+5. **DOWNLOAD_TIMEOUT (90s)**: Generous timeout to handle server degradation during large crawls (500-1000+ docs).
+6. **User-Agent rotation**: Requests use a standard browser User-Agent header to avoid bot detection.
 
 All parameters are configurable via environment variables, allowing operators to tune for different network conditions or server tolerance.
 
