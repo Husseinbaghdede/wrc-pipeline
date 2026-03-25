@@ -10,7 +10,8 @@ Key decisions:
   causes timeouts when too many requests queue up server-side
 - CONCURRENT_REQUESTS=4: moderate parallelism tuned to what the WRC server
   can handle; AutoThrottle adapts within this ceiling
-- RETRY_TIMES=3: retry failed requests up to 3 times before giving up
+- RETRY_TIMES=5: retry failed requests up to 5 times before giving up — the WRC
+  server can be flaky under sustained load, extra retries improve completion rate
 - User-Agent rotation via scrapy-user-agents or DOWNLOADER_MIDDLEWARES:
   rotates across real browser UAs to avoid fingerprint-based blocking
 """
@@ -22,6 +23,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from common.config import (
     DOWNLOAD_DELAY, CONCURRENT_REQUESTS, RETRY_TIMES, LOG_LEVEL,
+    RETRY_PRIORITY_ADJUST as _RETRY_PRIORITY_ADJUST,
     AUTOTHROTTLE_MAX_DELAY as _AUTOTHROTTLE_MAX_DELAY,
     AUTOTHROTTLE_TARGET_CONCURRENCY as _AUTOTHROTTLE_TARGET_CONCURRENCY,
     DOWNLOAD_TIMEOUT as _DOWNLOAD_TIMEOUT,
@@ -60,8 +62,9 @@ AUTOTHROTTLE_TARGET_CONCURRENCY = _AUTOTHROTTLE_TARGET_CONCURRENCY
 # --- Retries ---
 RETRY_TIMES = RETRY_TIMES
 RETRY_HTTP_CODES = [500, 502, 503, 504, 408, 429]
-# Back off on 429 (Too Many Requests) with exponential delay
-RETRY_PRIORITY_ADJUST = -1
+# Push retried requests to the back of the queue so fresh requests
+# go first and the server has time to recover before retries arrive.
+RETRY_PRIORITY_ADJUST = _RETRY_PRIORITY_ADJUST
 
 # --- User-Agent Rotation ---
 # Rotate across real browser user agents to avoid fingerprint-based blocking.
@@ -101,7 +104,8 @@ ITEM_PIPELINES = {
 # --- Request settings ---
 # Timeout for downloading a page (seconds).
 # The WRC site is slow — search queries often take 10-20s to respond.
-# 60s gives enough headroom for slow responses without false timeouts.
+# 90s gives enough headroom for slow responses during large crawls (500-1000+ docs)
+# where the server degrades under sustained load.
 DOWNLOAD_TIMEOUT = _DOWNLOAD_TIMEOUT
 
 # Don't cache (we want fresh data each time)
