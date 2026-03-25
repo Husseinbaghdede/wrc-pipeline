@@ -226,6 +226,7 @@ def store_transformed_metadata(collection, record, new_file_path, new_file_hash)
     """
     doc = {
         "identifier": record["identifier"],
+        "title": record.get("title", ""),
         "description": record["description"],
         "published_date": record["published_date"],
         "ref_no": record["ref_no"],

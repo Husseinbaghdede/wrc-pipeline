@@ -18,7 +18,7 @@ class RotateUserAgentMiddleware:
 
     @classmethod
     def from_crawler(cls, crawler):
-        user_agents = crawler.settings.getlist("_USER_AGENTS", [])
+        user_agents = crawler.settings.getlist("ROTATING_USER_AGENTS", [])
         if not user_agents:
             # Fallback to default USER_AGENT if list not configured
             user_agents = [crawler.settings.get("USER_AGENT")]

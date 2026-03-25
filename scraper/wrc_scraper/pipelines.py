@@ -195,6 +195,7 @@ class MongoDBPipeline:
         # Build the document to store
         doc = {
             "identifier": item["identifier"],
+            "title": item["title"],
             "description": item["description"],
             "published_date": item["published_date"],
             "ref_no": item["ref_no"],

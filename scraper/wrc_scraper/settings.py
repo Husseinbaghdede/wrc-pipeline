@@ -67,7 +67,7 @@ RETRY_PRIORITY_ADJUST = -1
 # Rotate across real browser user agents to avoid fingerprint-based blocking.
 # A single static UA makes all requests look like one bot session.
 # Rotating makes each request appear to come from a different browser.
-_USER_AGENTS = [
+ROTATING_USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
@@ -76,7 +76,7 @@ _USER_AGENTS = [
 ]
 
 # Default UA (Scrapy uses this for robots.txt fetch)
-USER_AGENT = _USER_AGENTS[0]
+USER_AGENT = ROTATING_USER_AGENTS[0]
 
 # Custom downloader middleware to rotate user agents per request
 DOWNLOADER_MIDDLEWARES = {
