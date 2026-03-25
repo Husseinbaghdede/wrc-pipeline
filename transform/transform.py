@@ -19,7 +19,6 @@ It creates a separate "transformed zone" with clean data.
 
 import argparse
 import hashlib
-import logging
 import sys
 import os
 from io import BytesIO
@@ -36,8 +35,9 @@ from common.config import (
 )
 from common.mongo_client import get_mongo_db
 from common.minio_client import get_minio_client
+from common.logging_config import setup_logging
 
-logger = logging.getLogger(__name__)
+logger = setup_logging("wrc_transform")
 
 
 def parse_args():
@@ -68,7 +68,15 @@ def fetch_landing_metadata(db, start_date, end_date):
         }
     }
     records = list(collection.find(query))
-    logger.info(f"Found {len(records)} records for partitions {start_partition} to {end_partition}")
+    logger.info(
+        f"Found {len(records)} records for partitions {start_partition} to {end_partition}",
+        extra={"extra_data": {
+            "event": "fetch_metadata",
+            "records_found": len(records),
+            "start_partition": start_partition,
+            "end_partition": end_partition,
+        }},
+    )
     return records
 
 
@@ -89,7 +97,14 @@ def download_file_from_minio(minio_client, file_path):
         response.release_conn()
         return content
     except Exception as e:
-        logger.error(f"Failed to download {object_name} from MinIO: {e}")
+        logger.error(
+            f"Failed to download {object_name} from MinIO: {e}",
+            extra={"extra_data": {
+                "event": "download_failed",
+                "object_name": object_name,
+                "error": str(e),
+            }},
+        )
         return None
 
 
@@ -275,7 +290,13 @@ def run_transformation(start_date, end_date):
             # Do this BEFORE downloading to avoid wasting bandwidth on re-runs
             existing = transformed_collection.find_one({"identifier": identifier})
             if existing and existing.get("source_hash") == record.get("file_hash"):
-                logger.info(f"Already transformed, skipping: {identifier}")
+                logger.info(
+                    f"Already transformed, skipping: {identifier}",
+                    extra={"extra_data": {
+                        "event": "transform_skipped",
+                        "identifier": identifier,
+                    }},
+                )
                 skip_count += 1
                 continue
 
@@ -299,21 +320,42 @@ def run_transformation(start_date, end_date):
             )
 
             success_count += 1
-            logger.info(f"Transformed: {identifier}")
+            logger.info(
+                f"Transformed: {identifier}",
+                extra={"extra_data": {
+                    "event": "transform_success",
+                    "identifier": identifier,
+                    "file_type": file_ext,
+                    "file_name": new_file_name,
+                }},
+            )
 
         except Exception as e:
             error_count += 1
-            logger.error(f"Error transforming {identifier}: {e}")
+            logger.error(
+                f"Error transforming {identifier}: {e}",
+                extra={"extra_data": {
+                    "event": "transform_error",
+                    "identifier": identifier,
+                    "error": str(e),
+                }},
+            )
 
     # Summary
     logger.info(
         f"Transformation complete: {success_count} transformed, "
         f"{skip_count} skipped, {error_count} errors, "
-        f"{len(records)} total records"
+        f"{len(records)} total records",
+        extra={"extra_data": {
+            "event": "transform_summary",
+            "total_records": len(records),
+            "transformed": success_count,
+            "skipped": skip_count,
+            "errors": error_count,
+        }},
     )
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     args = parse_args()
     run_transformation(args.start_date, args.end_date)
